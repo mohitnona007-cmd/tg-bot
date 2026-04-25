@@ -15,8 +15,11 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN not set")
 
+movie_suggestions = []
+waiting_for_movie = set()
 
-# /start menu
+
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🎬 Vote Movie", callback_data="vote")],
@@ -32,9 +35,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# Button actions
+# buttons
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
+
     await query.answer()
 
     if query.data == "rules":
@@ -44,38 +49,60 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "2. No spam 🚫\n"
             "3. Keep discussion movie-related 🎬\n"
             "4. No unnecessary forwards ❌\n"
-            "5. Join meetups only if you're serious 😄"
-        )
-
-    elif query.data == "vote":
-        await query.message.reply_poll(
-            question="🎬 Which movie should we watch?",
-            options=[
-                "Interstellar",
-                "Dune Part Two",
-                "John Wick",
-                "Suggest your own below ✍️",
-            ],
-            is_anonymous=False,
+            "5. Join meetups only if serious 😄"
         )
 
     elif query.data == "suggest":
+        waiting_for_movie.add(user_id)
         await query.message.reply_text(
-            "✍️ Reply in chat with your movie suggestion.\n\nExample:\nDeadpool & Wolverine"
+            "✍️ Send your movie suggestion in chat."
+        )
+
+    elif query.data == "vote":
+        if not movie_suggestions:
+            await query.message.reply_text(
+                "No movie suggestions yet 😅\nUse ✍️ Suggest Movie first."
+            )
+            return
+
+        await query.message.reply_poll(
+            question="🎬 Which movie should we watch?",
+            options=movie_suggestions[:10],
+            is_anonymous=False,
         )
 
 
-# Welcome message
+# capture suggested movie
+async def save_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    text = update.message.text.strip()
+
+    if user_id in waiting_for_movie:
+        if text.lower() in [m.lower() for m in movie_suggestions]:
+            await update.message.reply_text("That movie is already suggested 🎬")
+        else:
+            movie_suggestions.append(text)
+            await update.message.reply_text(f"Added: {text} ✅")
+
+        waiting_for_movie.remove(user_id)
+
+
+# welcome
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
         for user in update.message.new_chat_members:
             name = user.first_name
 
             msg = await update.message.reply_text(
-                f"Welcome {name}! 🎬\nTap /start to see options."
+                f"Welcome {name}! 🎬\n\n"
+                "Please introduce yourself 👋\n"
+                "• Name:\n"
+                "• Area:\n"
+                "• Favorite Movies:\n\n"
+                "Then tap /start for group options."
             )
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(30)
             await msg.delete()
 
 
@@ -84,6 +111,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_movie))
 
 print("Bot running 🚀")
 app.run_polling()
