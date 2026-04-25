@@ -18,8 +18,20 @@ if not TOKEN:
 movie_suggestions = []
 waiting_for_movie = set()
 
+BAD_WORDS = {
+    "fuck",
+    "bitch",
+    "shit",
+    "mc",
+    "bc",
+    "madarchod",
+    "behenchod",
+    "gandu",
+    "chutiya",
+}
 
-# /start
+
+# /start menu
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🎬 Vote Movie", callback_data="vote")],
@@ -27,15 +39,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📜 Rules", callback_data="rules")],
     ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(
-        "Welcome to the movie group 🎬\nChoose an option:",
-        reply_markup=reply_markup,
+        "Welcome 👋\nChoose an option:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# buttons
+# Button actions
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -47,9 +57,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📜 Group Rules:\n\n"
             "1. Respect everyone 🤝\n"
             "2. No spam 🚫\n"
-            "3. Keep discussion movie-related 🎬\n"
-            "4. No unnecessary forwards ❌\n"
-            "5. Join meetups only if serious 😄"
+            "3. No abusive language ❌\n"
+            "4. No harassment / personal attacks 🚫\n"
+            "5. No unnecessary forwards ❌\n"
+            "6. Keep things chill and friendly 😄"
         )
 
     elif query.data == "suggest":
@@ -67,13 +78,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_poll(
             question="🎬 Which movie should we watch?",
-            options=movie_suggestions[:10],
+            options=movie_suggestions[:9] + ["NOTA 🙅"],
             is_anonymous=False,
         )
 
 
-# capture suggested movie
+# Save movie suggestions
 async def save_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
     user_id = update.message.from_user.id
     text = update.message.text.strip()
 
@@ -87,19 +101,39 @@ async def save_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
         waiting_for_movie.remove(user_id)
 
 
-# welcome
+# Cuss filter
+async def moderate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.lower()
+
+    if any(word in text for word in BAD_WORDS):
+        try:
+            await update.message.delete()
+
+            warn = await update.effective_chat.send_message(
+                f"{update.effective_user.first_name}, keep chat clean 👍"
+            )
+
+            await asyncio.sleep(5)
+            await warn.delete()
+
+        except Exception:
+            pass
+
+
+# Welcome new members
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
         for user in update.message.new_chat_members:
-            name = user.first_name
-
             msg = await update.message.reply_text(
-                f"Welcome {name}! 🎬\n\n"
-                "Please introduce yourself 👋\n"
+                f"Welcome {user.first_name}! 🎬\n\n"
+                "Introduce yourself 👋\n"
                 "• Name:\n"
                 "• Area:\n"
                 "• Favorite Movies:\n\n"
-                "Then tap /start for group options."
+                "Tap /start for group options."
             )
 
             await asyncio.sleep(30)
@@ -112,6 +146,7 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_movie))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, moderate))
 
 print("Bot running 🚀")
 app.run_polling()
