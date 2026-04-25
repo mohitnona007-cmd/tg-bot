@@ -1,15 +1,11 @@
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     CommandHandler,
     CallbackQueryHandler,
-    filters,
     ContextTypes,
+    filters,
 )
 import asyncio
 import os
@@ -17,14 +13,13 @@ import re
 import requests
 import urllib.parse
 import random
-from datetime import datetime
+from datetime import datetime, time, timezone, timedelta
 
 TOKEN = os.getenv("TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
-
 if not OMDB_API_KEY:
     raise ValueError("OMDB_API_KEY not set")
 
@@ -32,17 +27,11 @@ movie_suggestions = []
 waiting_for_movie = set()
 warns = {}
 user_message_times = {}
+GROUP_CHAT_ID = None
 
 BAD_WORDS = {
-    "fuck",
-    "bitch",
-    "shit",
-    "mc",
-    "bc",
-    "madarchod",
-    "behenchod",
-    "gandu",
-    "chutiya",
+    "fuck", "bitch", "shit", "mc", "bc",
+    "madarchod", "behenchod", "gandu", "chutiya"
 }
 
 DAILY_QUESTIONS = [
@@ -61,8 +50,19 @@ async def is_admin(chat_id, user_id, context):
     return member.status in ["administrator", "creator"]
 
 
-# ---------------- START MENU ----------------
+async def auto_daily_question(context: ContextTypes.DEFAULT_TYPE):
+    global GROUP_CHAT_ID
+    if GROUP_CHAT_ID:
+        await context.bot.send_message(
+            chat_id=GROUP_CHAT_ID,
+            text=random.choice(DAILY_QUESTIONS)
+        )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global GROUP_CHAT_ID
+    GROUP_CHAT_ID = update.effective_chat.id
+
     keyboard = [
         [InlineKeyboardButton("🎬 Vote Movie", callback_data="vote")],
         [InlineKeyboardButton("✍️ Suggest Movie", callback_data="suggest")],
@@ -77,11 +77,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------------- BUTTONS ----------------
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
-    chat_id = query.message.chat_id
 
     await query.answer()
 
@@ -101,7 +99,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("✍️ Send your movie suggestion in chat.")
 
     elif query.data == "vote":
-      if not movie_suggestions:
+        if not movie_suggestions:
             await query.message.reply_text(
                 "No movie suggestions yet 😅\nUse ✍️ Suggest Movie first."
             )
@@ -114,10 +112,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif query.data == "daily":
-        if not await is_admin(chat_id, user_id, context):
-            await query.message.reply_text("Only admins can post daily questions 👮")
-            return
-
         await query.message.reply_text(random.choice(DAILY_QUESTIONS))
 
     elif query.data == "trailer_help":
@@ -126,34 +120,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# ---------------- SAVE MOVIE SUGGESTIONS ----------------
-async def save_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-
-    user_id = update.message.from_user.id
-    text = update.message.text.strip()
-
-    if user_id in waiting_for_movie:
-        if text.lower() in [m.lower() for m in movie_suggestions]:
-            await update.message.reply_text("That movie is already suggested 🎬")
-        else:
-            movie_suggestions.append(text)
-            await update.message.reply_text(f"Added: {text} ✅")
-
-        waiting_for_movie.remove(user_id)
-
-
-# ---------------- MOVIE LOOKUP ----------------
 async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: /movie movie name")
         return
 
     movie_name = " ".join(context.args)
-
     url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&t={urllib.parse.quote(movie_name)}"
-    response = requests.get(url).json()
+
+    try:
+        response = requests.get(url, timeout=10).json()
+    except Exception:
+        await update.message.reply_text("Couldn't fetch movie info 😅")
+        return
 
     if response.get("Response") == "False":
         await update.message.reply_text("Movie not found 😅")
@@ -171,9 +150,7 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         + urllib.parse.quote(f"{title} trailer")
     )
 
-    keyboard = [
-        [InlineKeyboardButton("▶ Watch Trailer", url=trailer_url)]
-    ]
+    keyboard = [[InlineKeyboardButton("▶ Watch Trailer", url=trailer_url)]]
 
     await update.message.reply_text(
         f"🎬 {title} ({year})\n"
@@ -185,7 +162,6 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------------- WELCOME ----------------
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
         for user in update.message.new_chat_members:
@@ -200,8 +176,12 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             await asyncio.sleep(30)
-            await msg.delete()
-            # ---------------- WARN SYSTEM ----------------
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+
+
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update.effective_chat.id, update.effective_user.id, context):
         await update.message.reply_text("Admins only 👮")
@@ -218,32 +198,26 @@ async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = warns[target_id]
 
     await update.message.reply_text(
-        f"⚠ {target.first_name} has been warned ({count}/3)"
+        f"⚠ {target.first_name} warned ({count}/3)"
     )
 
     if count >= 3:
-        until = datetime.utcnow().timestamp() + 3600
+        until = datetime.now(timezone.utc) + timedelta(hours=1)
 
-        try:
-            await context.bot.restrict_chat_member(
-                chat_id=update.effective_chat.id,
-                user_id=target_id,
-                permissions={},
-                until_date=until,
-            )
+        await context.bot.restrict_chat_member(
+            chat_id=update.effective_chat.id,
+            user_id=target_id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until,
+        )
 
-            warns[target_id] = 0
+        warns[target_id] = 0
 
-            await update.message.reply_text(
-                f"🔇 {target.first_name} muted for 1 hour."
-            )
-        except Exception:
-            await update.message.reply_text(
-                "Couldn't mute user (check bot admin permissions)."
-            )
+        await update.message.reply_text(
+            f"🔇 {target.first_name} muted for 1 hour."
+        )
 
 
-# ---------------- MAIN TEXT HANDLER ----------------
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -252,23 +226,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
+    lower = text.lower()
 
-    # -------- ANTI LINK SPAM --------
-    if "http://" in text.lower() or "https://" in text.lower() or "t.me/" in text.lower():
-        try:
-            if not await is_admin(chat_id, user_id, context):
+    # promo / invite links only
+    suspicious = ["t.me/", "joinchat", "bit.ly", "tinyurl", "discord.gg"]
+    if any(x in lower for x in suspicious):
+        if not await is_admin(chat_id, user_id, context):
+            try:
                 await update.message.delete()
-                warn = await update.effective_chat.send_message(
-                    f"{user.first_name}, links are not allowed 🚫"
-                )
-                await asyncio.sleep(5)
-                await warn.delete()
                 return
-        except Exception:
-            pass
+            except Exception:
+                pass
 
-    # -------- FLOOD CONTROL --------
-    now = datetime.utcnow().timestamp()
+    # flood control
+    now = datetime.now().timestamp()
 
     if user_id not in user_message_times:
         user_message_times[user_id] = []
@@ -277,50 +248,45 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         t for t in user_message_times[user_id]
         if now - t <= 10
     ]
-
     user_message_times[user_id].append(now)
 
     if len(user_message_times[user_id]) >= 5:
-        try:
-            if not await is_admin(chat_id, user_id, context):
-                until = now + 300
+        if not await is_admin(chat_id, user_id, context):
+            until = datetime.now(timezone.utc) + timedelta(minutes=5)
 
-                await context.bot.restrict_chat_member(
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    permissions={},
-                    until_date=until,
-                )
+            await context.bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until,
+            )
 
-                msg = await update.effective_chat.send_message(
-                    f"{user.first_name} muted for spam (5 mins) 🚫"
-                )
-
-                await asyncio.sleep(5)
+            msg = await update.effective_chat.send_message(
+                f"{user.first_name} muted for spam (5 mins) 🚫"
+            )
+            await asyncio.sleep(5)
+            try:
                 await msg.delete()
-                return
-        except Exception:
-            pass
+            except Exception:
+                pass
+            return
 
-    # -------- CUSS FILTER --------
-    clean_words = re.findall(r"\b\w+\b", text.lower())
-
+    # cuss filter
+    clean_words = re.findall(r"\b\w+\b", lower)
     if any(word in BAD_WORDS for word in clean_words):
-        try:
-            if not await is_admin(chat_id, user_id, context):
+        if not await is_admin(chat_id, user_id, context):
+            try:
                 await update.message.delete()
-
                 warn = await update.effective_chat.send_message(
                     f"{user.first_name}, keep chat clean 👍"
                 )
-
                 await asyncio.sleep(5)
                 await warn.delete()
                 return
-        except Exception:
-            return
+            except Exception:
+                return
 
-    # -------- SAVE MOVIE SUGGESTION --------
+    # save movie suggestion
     if user_id in waiting_for_movie:
         if text.lower() in [m.lower() for m in movie_suggestions]:
             await update.message.reply_text("That movie is already suggested 🎬")
@@ -331,22 +297,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         waiting_for_movie.remove(user_id)
 
 
-# ---------------- APP START ----------------
 app = ApplicationBuilder().token(TOKEN).build()
+
+# 8 PM IST = 14:30 UTC
+app.job_queue.run_daily(
+    auto_daily_question,
+    time=time(hour=14, minute=30, tzinfo=timezone.utc)
+)
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
-
 app.add_handler(CallbackQueryHandler(button_handler))
-
-app.add_handler(
-    MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome)
-)
-
-app.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
-)
+app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
 print("Bot running 🚀")
 app.run_polling()
