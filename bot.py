@@ -415,7 +415,7 @@ async def save_movie_suggestion(
             )
 
         waiting_for_movie.remove(user_id)
-        async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+     async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
         update.effective_user.id,
@@ -447,9 +447,7 @@ async def save_movie_suggestion(
             await context.bot.restrict_chat_member(
                 chat_id=update.effective_chat.id,
                 user_id=target_id,
-                permissions=ChatPermissions(
-                    can_send_messages=False
-                ),
+                permissions=ChatPermissions(can_send_messages=False),
                 until_date=until,
             )
 
@@ -458,6 +456,7 @@ async def save_movie_suggestion(
             await update.message.reply_text(
                 f"🔇 {target.first_name} muted for 1 hour."
             )
+
         except Exception:
             await update.message.reply_text(
                 "Couldn't mute user. Check admin permissions."
@@ -474,7 +473,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     lower = text.lower()
 
-    # promo / invite links
     suspicious = [
         "t.me/",
         "joinchat",
@@ -491,7 +489,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-    # flood control
     now = datetime.now().timestamp()
 
     if user_id not in user_message_times:
@@ -507,16 +504,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_message_times[user_id]) >= 5:
         if not await is_admin(chat_id, user_id, context):
             try:
-                until = datetime.now(
-                    timezone.utc
-                ) + timedelta(minutes=5)
+                until = datetime.now(timezone.utc) + timedelta(minutes=5)
 
                 await context.bot.restrict_chat_member(
                     chat_id=chat_id,
                     user_id=user_id,
-                    permissions=ChatPermissions(
-                        can_send_messages=False
-                    ),
+                    permissions=ChatPermissions(can_send_messages=False),
                     until_date=until,
                 )
 
@@ -532,14 +525,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
 
                 return
+
             except Exception:
                 pass
 
-    # cuss filter
-    clean_words = re.findall(
-        r"\b\w+\b",
-        lower,
-    )
+    clean_words = re.findall(r"\b\w+\b", lower)
 
     if any(word in BAD_WORDS for word in clean_words):
         if not await is_admin(chat_id, user_id, context):
@@ -558,43 +548,29 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
 
                 return
+
             except Exception:
                 return
 
-    # save movie suggestion
     await save_movie_suggestion(update, context)
 
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-# 8 PM IST = 14:30 UTC
 app.job_queue.run_daily(
     auto_daily_question,
-    time=time(
-        hour=14,
-        minute=30,
-        tzinfo=timezone.utc,
-    ),
+    time=time(hour=14, minute=30, tzinfo=timezone.utc),
 )
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
-
 app.add_handler(CallbackQueryHandler(button_handler))
-
 app.add_handler(
-    MessageHandler(
-        filters.StatusUpdate.NEW_CHAT_MEMBERS,
-        welcome,
-    )
+    MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome)
 )
-
 app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_text,
-    )
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
 )
 
 print("Bot running 🚀")
