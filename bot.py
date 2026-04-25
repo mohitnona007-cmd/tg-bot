@@ -101,11 +101,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("✍️ Send your movie suggestion in chat.")
 
     elif query.data == "vote":
-        if not await is_admin(chat_id, user_id, context):
-            await query.message.reply_text("Only admins can start polls 👮")
-            return
-
-        if not movie_suggestions:
+      if not movie_suggestions:
             await query.message.reply_text(
                 "No movie suggestions yet 😅\nUse ✍️ Suggest Movie first."
             )
