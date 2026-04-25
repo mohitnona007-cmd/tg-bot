@@ -48,13 +48,23 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     global GROUP_CHAT_ID
     GROUP_CHAT_ID = update.effective_chat.id
 
-    kb = [
-        [InlineKeyboardButton("🎬 Vote",callback_data="vote")],
-        [InlineKeyboardButton("✍️ Suggest",callback_data="suggest")],
-        [InlineKeyboardButton("🎭 Genre",callback_data="genre")],
-        [InlineKeyboardButton("📜 Rules",callback_data="rules")],
-        [InlineKeyboardButton("💬 Daily",callback_data="daily")]
-    ]
+   kb = [
+    [
+        InlineKeyboardButton("Comedy", callback_data="g_comedy"),
+        InlineKeyboardButton("Action", callback_data="g_action"),
+    ],
+    [
+        InlineKeyboardButton("Horror", callback_data="g_horror"),
+        InlineKeyboardButton("Romance", callback_data="g_romance"),
+    ],
+    [
+        InlineKeyboardButton("Sci-Fi", callback_data="g_scifi"),
+        InlineKeyboardButton("Drama", callback_data="g_drama"),
+    ],
+    [
+        InlineKeyboardButton("Random", callback_data="g_random"),
+    ],
+]
     await update.message.reply_text("Choose:",reply_markup=InlineKeyboardMarkup(kb))
 
 
