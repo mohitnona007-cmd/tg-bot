@@ -1,17 +1,35 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.ext import (
-    ApplicationBuilder, MessageHandler, CommandHandler,
-    CallbackQueryHandler, ContextTypes, filters
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ChatPermissions,
 )
-import asyncio, os, re, requests, urllib.parse, random
+from telegram.ext import (
+    ApplicationBuilder,
+    MessageHandler,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters,
+)
+import asyncio
+import os
+import re
+import random
+import requests
+import urllib.parse
 from datetime import datetime, time, timezone, timedelta
 
 TOKEN = os.getenv("TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
-if not TOKEN or not OMDB_API_KEY or not TMDB_API_KEY:
-    raise ValueError("Missing environment variables")
+if not TOKEN:
+    raise ValueError("TOKEN not set")
+if not OMDB_API_KEY:
+    raise ValueError("OMDB_API_KEY not set")
+if not TMDB_API_KEY:
+    raise ValueError("TMDB_API_KEY not set")
 
 movie_suggestions = []
 waiting_for_movie = set()
@@ -19,202 +37,475 @@ warns = {}
 user_message_times = {}
 GROUP_CHAT_ID = None
 
-BAD_WORDS = {"fuck","bitch","shit","mc","bc","madarchod","behenchod","gandu","chutiya"}
+BAD_WORDS = {
+    "fuck",
+    "bitch",
+    "shit",
+    "mc",
+    "bc",
+    "madarchod",
+    "behenchod",
+    "gandu",
+    "chutiya",
+}
 
 DAILY_QUESTIONS = [
     "🎬 Best movie sequel ever?",
     "🍿 Most underrated movie?",
-    "😱 Best thriller?",
-    "😂 Funniest movie?",
-    "❤️ Best romance?",
-    "🔥 Best actor?",
-    "🎥 Movie you'd rewatch fresh?"
+    "😱 Best thriller ever?",
+    "😂 Funniest movie you've watched?",
+    "❤️ Best romance movie?",
+    "🔥 Which actor never disappoints?",
+    "🎥 One movie you'd watch again fresh?",
 ]
 
 GENRE_MAP = {
-    "comedy":35,"action":28,"horror":27,
-    "romance":10749,"scifi":878,"drama":18
+    "comedy": 35,
+    "action": 28,
+    "horror": 27,
+    "romance": 10749,
+    "scifi": 878,
+    "drama": 18,
 }
 
-recent_genre = {k:[] for k in ["comedy","action","horror","romance","scifi","drama","random"]}
+recent_genre = {
+    "comedy": [],
+    "action": [],
+    "horror": [],
+    "romance": [],
+    "scifi": [],
+    "drama": [],
+    "random": [],
+}
 
 
-async def is_admin(chat_id,user_id,context):
-    m = await context.bot.get_chat_member(chat_id,user_id)
-    return m.status in ["administrator","creator"]
+async def is_admin(chat_id, user_id, context):
+    member = await context.bot.get_chat_member(chat_id, user_id)
+    return member.status in ["administrator", "creator"]
 
 
-async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
+async def auto_daily(context: ContextTypes.DEFAULT_TYPE):
+    global GROUP_CHAT_ID
+
+    if GROUP_CHAT_ID:
+        await context.bot.send_message(
+            chat_id=GROUP_CHAT_ID,
+            text=random.choice(DAILY_QUESTIONS),
+        )
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GROUP_CHAT_ID
     GROUP_CHAT_ID = update.effective_chat.id
 
-   kb = [
-    [
-        InlineKeyboardButton("Comedy", callback_data="g_comedy"),
-        InlineKeyboardButton("Action", callback_data="g_action"),
-    ],
-    [
-        InlineKeyboardButton("Horror", callback_data="g_horror"),
-        InlineKeyboardButton("Romance", callback_data="g_romance"),
-    ],
-    [
-        InlineKeyboardButton("Sci-Fi", callback_data="g_scifi"),
-        InlineKeyboardButton("Drama", callback_data="g_drama"),
-    ],
-    [
-        InlineKeyboardButton("Random", callback_data="g_random"),
-    ],
-]
-    await update.message.reply_text("Choose:",reply_markup=InlineKeyboardMarkup(kb))
-
-
-async def welcome(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    for u in update.message.new_chat_members:
-        msg = await update.message.reply_text(
-            f"Welcome {u.first_name}! 🎬\nIntroduce yourself!"
-        )
-        await asyncio.sleep(20)
-        try: await msg.delete()
-        except: pass
-
-
-def fetch_movies(genre):
-    gid = random.choice(list(GENRE_MAP.values())) if genre=="random" else GENRE_MAP[genre]
-    page = random.randint(1,10)
-
-    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&with_genres={gid}&vote_average.gte=6.8&vote_count.gte=300&with_original_language=en&page={page}"
-    data = requests.get(url).json().get("results",[])
-
-    fresh = [m for m in data if m["id"] not in recent_genre[genre]]
-
-    if len(fresh)<5:
-        recent_genre[genre]=[]
-        return fetch_movies(genre)
-
-    picks = random.sample(fresh,5)
-    recent_genre[genre]+= [m["id"] for m in picks]
-    return picks
-
-
-async def send_genre(query,genre):
-    movies = fetch_movies(genre)
-
-    txt = f"🎬 {genre.title()} Picks\n\n"
-    for i,m in enumerate(movies,1):
-        link = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(m["title"]+" trailer")
-        year = m["release_date"][:4] if m.get("release_date") else ""
-        txt += f"{i}. <a href='{link}'>{m['title']} ({year})</a>\n"
-
-    await query.message.reply_text(txt,parse_mode="HTML",disable_web_page_preview=True)
-
-
-async def movie(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    name = " ".join(context.args)
-    if not name:
-        await update.message.reply_text("Usage: /movie name")
-        return
-
-    url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&t={urllib.parse.quote(name)}"
-    data = requests.get(url).json()
-
-    if data.get("Response")=="False":
-        await update.message.reply_text("Not found")
-        return
-
-    trailer = "https://www.youtube.com/results?search_query="+urllib.parse.quote(data["Title"]+" trailer")
+    keyboard = [
+        [InlineKeyboardButton("🎬 Vote Movie", callback_data="vote")],
+        [InlineKeyboardButton("✍️ Suggest Movie", callback_data="suggest")],
+        [InlineKeyboardButton("🎭 Suggest by Genre", callback_data="genre_menu")],
+        [InlineKeyboardButton("📜 Rules", callback_data="rules")],
+        [InlineKeyboardButton("💬 Daily Question", callback_data="daily")],
+        [InlineKeyboardButton("🎞 Trailer Search", callback_data="trailer_help")],
+    ]
 
     await update.message.reply_text(
-        f"🎬 {data['Title']} ({data['Year']})\n⭐ {data['imdbRating']}\n{data['Plot']}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("▶ Trailer",url=trailer)]])
+        "Welcome 👋\nChoose an option:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-async def button(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    d = q.data
+async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.new_chat_members:
+        for user in update.message.new_chat_members:
+            msg = await update.message.reply_text(
+                f"Welcome {user.first_name}! 🎬\n\n"
+                "Introduce yourself 👋\n"
+                "• Name:\n"
+                "• Area:\n"
+                "• Favorite Movies:\n"
+                "• Favorite Genre:"
+            )
 
-    if d=="rules":
-        await q.message.reply_text("Respect everyone. No spam. No abuse.")
+            await asyncio.sleep(20)
 
-    elif d=="suggest":
-        waiting_for_movie.add(q.from_user.id)
-        await q.message.reply_text("Send movie name")
+            try:
+                await msg.delete()
+            except Exception:
+                pass
 
-    elif d=="vote":
+
+def fetch_movies(genre_key):
+    if genre_key == "random":
+        genre_id = random.choice(list(GENRE_MAP.values()))
+    else:
+        genre_id = GENRE_MAP[genre_key]
+
+    page = random.randint(1, 10)
+
+    url = (
+        "https://api.themoviedb.org/3/discover/movie"
+        f"?api_key={TMDB_API_KEY}"
+        f"&with_genres={genre_id}"
+        "&vote_count.gte=300"
+        "&vote_average.gte=6.8"
+        "&with_original_language=en"
+        "&sort_by=popularity.desc"
+        f"&page={page}"
+    )
+
+    try:
+        results = requests.get(url, timeout=15).json()["results"]
+    except Exception:
+        return []
+
+    fresh = [
+        m for m in results
+        if m["id"] not in recent_genre[genre_key]
+    ]
+
+    if len(fresh) < 5:
+        recent_genre[genre_key] = []
+        fresh = results
+
+    picks = random.sample(fresh, 5)
+
+    recent_genre[genre_key].extend(
+        [m["id"] for m in picks]
+    )
+
+    recent_genre[genre_key] = recent_genre[genre_key][-50:]
+
+    return picks
+
+async def send_genre_recommendations(query, genre_key):
+    movies = fetch_movies(genre_key)
+
+    if not movies:
+        await query.message.reply_text(
+            "Couldn't fetch recommendations 😅"
+        )
+        return
+
+    title_map = {
+        "comedy": "😂 Comedy Picks",
+        "action": "🔥 Action Picks",
+        "horror": "😱 Horror Picks",
+        "romance": "❤️ Romance Picks",
+        "scifi": "🧠 Sci-Fi Picks",
+        "drama": "🎭 Drama Picks",
+        "random": "🎲 Random Picks",
+    }
+
+    lines = [f"{title_map[genre_key]}\n"]
+
+    for i, movie in enumerate(movies, start=1):
+        title = movie.get("title", "Unknown")
+        release = movie.get("release_date", "")
+        year = release[:4] if release else "N/A"
+
+        trailer = (
+            "https://www.youtube.com/results?search_query="
+            + urllib.parse.quote(f"{title} trailer")
+        )
+
+        lines.append(
+            f"{i}. "
+            f"<a href='{trailer}'>"
+            f"{title} ({year})"
+            f"</a>"
+        )
+
+    await query.message.reply_text(
+        "\n".join(lines),
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
+
+
+async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /movie movie name")
+        return
+
+    movie_name = " ".join(context.args)
+
+    url = (
+        f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
+        f"&t={urllib.parse.quote(movie_name)}"
+    )
+
+    try:
+        data = requests.get(url, timeout=10).json()
+    except Exception:
+        await update.message.reply_text(
+            "Couldn't fetch movie info 😅"
+        )
+        return
+
+    if data.get("Response") == "False":
+        await update.message.reply_text("Movie not found 😅")
+        return
+
+    title = data.get("Title", "N/A")
+    year = data.get("Year", "N/A")
+    rating = data.get("imdbRating", "N/A")
+    plot = data.get("Plot", "N/A")
+
+    trailer = (
+        "https://www.youtube.com/results?search_query="
+        + urllib.parse.quote(f"{title} trailer")
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("▶ Watch Trailer", url=trailer)]
+    ]
+
+    await update.message.reply_text(
+        f"🎬 {title} ({year})\n"
+        f"⭐ IMDb: {rating}\n\n"
+        f"{plot}",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    data = query.data
+
+    await query.answer()
+
+    if data == "rules":
+        await query.message.reply_text(
+            "📜 Rules:\n"
+            "• Respect everyone\n"
+            "• No spam\n"
+            "• No abusive language\n"
+            "• Keep chat friendly"
+        )
+
+    elif data == "suggest":
+        waiting_for_movie.add(user_id)
+        await query.message.reply_text(
+            "✍️ Send movie name in chat."
+        )
+
+    elif data == "vote":
         if not movie_suggestions:
-            await q.message.reply_text("No suggestions")
+            await query.message.reply_text(
+                "No suggestions yet 😅"
+            )
             return
-        await q.message.reply_poll("Pick movie",movie_suggestions[:9]+["NOTA"])
 
-    elif d=="daily":
-        await q.message.reply_text(random.choice(DAILY_QUESTIONS))
+        await query.message.reply_poll(
+            question="🎬 Which movie should we watch?",
+            options=movie_suggestions[:9] + ["NOTA 🙅"],
+            is_anonymous=False,
+        )
 
-    elif d=="genre":
-        kb = [
-            [InlineKeyboardButton("Comedy","g_comedy"),InlineKeyboardButton("Action","g_action")],
-            [InlineKeyboardButton("Horror","g_horror"),InlineKeyboardButton("Romance","g_romance")],
-            [InlineKeyboardButton("Sci-Fi","g_scifi"),InlineKeyboardButton("Drama","g_drama")],
-            [InlineKeyboardButton("Random","g_random")]
+    elif data == "daily":
+        await query.message.reply_text(
+            random.choice(DAILY_QUESTIONS)
+        )
+
+    elif data == "trailer_help":
+        await query.message.reply_text(
+            "Use:\n/movie Interstellar"
+        )
+
+    elif data == "genre_menu":
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "😂 Comedy",
+                    callback_data="genre_comedy"
+                ),
+                InlineKeyboardButton(
+                    "🔥 Action",
+                    callback_data="genre_action"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "😱 Horror",
+                    callback_data="genre_horror"
+                ),
+                InlineKeyboardButton(
+                    "❤️ Romance",
+                    callback_data="genre_romance"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "🧠 Sci-Fi",
+                    callback_data="genre_scifi"
+                ),
+                InlineKeyboardButton(
+                    "🎭 Drama",
+                    callback_data="genre_drama"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "🎲 Random",
+                    callback_data="genre_random"
+                )
+            ],
         ]
-        await q.message.reply_text("Pick genre",reply_markup=InlineKeyboardMarkup(kb))
 
-    elif d.startswith("g_"):
-        await send_genre(q,d.split("_")[1])
+        await query.message.reply_text(
+            "Pick genre 🎬",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    elif data.startswith("genre_"):
+        genre = data.replace("genre_", "")
+        await send_genre_recommendations(
+            query,
+            genre,
+        )
 
 
-async def warn(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update.effective_chat.id,update.effective_user.id,context):
+async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(
+        update.effective_chat.id,
+        update.effective_user.id,
+        context,
+    ):
         return
 
     if not update.message.reply_to_message:
         return
 
-    t = update.message.reply_to_message.from_user
-    warns[t.id]=warns.get(t.id,0)+1
+    target = update.message.reply_to_message.from_user
+    target_id = target.id
 
-    if warns[t.id]>=3:
-        until = datetime.now(timezone.utc)+timedelta(hours=1)
-        await context.bot.restrict_chat_member(update.effective_chat.id,t.id,ChatPermissions(can_send_messages=False),until)
-        warns[t.id]=0
+    warns[target_id] = warns.get(target_id, 0) + 1
 
+    if warns[target_id] >= 3:
+        until = datetime.now(
+            timezone.utc
+        ) + timedelta(hours=1)
 
-async def handle(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    txt = update.message.text.lower()
-    uid = update.effective_user.id
+        await context.bot.restrict_chat_member(
+            chat_id=update.effective_chat.id,
+            user_id=target_id,
+            permissions=ChatPermissions(
+                can_send_messages=False
+            ),
+            until_date=until,
+        )
 
-    if any(x in txt for x in ["t.me","bit.ly","discord.gg"]):
-        if not await is_admin(update.effective_chat.id,uid,context):
-            await update.message.delete()
-            return
+        warns[target_id] = 0
 
-    if any(w in txt for w in BAD_WORDS):
-        if not await is_admin(update.effective_chat.id,uid,context):
-            await update.message.delete()
-            return
-
-    if uid in waiting_for_movie:
-        if txt not in movie_suggestions:
-            movie_suggestions.append(txt)
-            await update.message.reply_text(f"Added: {txt}")
-        waiting_for_movie.remove(uid)
+        await update.message.reply_text(
+            f"{target.first_name} muted for 1 hour 🔇"
+        )
 
 
-async def auto_q(context:ContextTypes.DEFAULT_TYPE):
-    if GROUP_CHAT_ID:
-        await context.bot.send_message(GROUP_CHAT_ID,random.choice(DAILY_QUESTIONS))
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    user = update.effective_user
+    user_id = user.id
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+    lower = text.lower()
+
+    suspicious = [
+        "t.me/",
+        "joinchat",
+        "bit.ly",
+        "tinyurl",
+        "discord.gg",
+    ]
+
+    if any(x in lower for x in suspicious):
+        if not await is_admin(chat_id, user_id, context):
+            try:
+                await update.message.delete()
+                return
+            except Exception:
+                pass
+
+    words = re.findall(r"\b\w+\b", lower)
+
+    if any(w in BAD_WORDS for w in words):
+        if not await is_admin(chat_id, user_id, context):
+            try:
+                await update.message.delete()
+                return
+            except Exception:
+                pass
+
+    now = datetime.now().timestamp()
+
+    if user_id not in user_message_times:
+        user_message_times[user_id] = []
+
+    user_message_times[user_id] = [
+        t for t in user_message_times[user_id]
+        if now - t <= 10
+    ]
+
+    user_message_times[user_id].append(now)
+
+    if len(user_message_times[user_id]) >= 5:
+        if not await is_admin(chat_id, user_id, context):
+            try:
+                until = datetime.now(
+                    timezone.utc
+                ) + timedelta(minutes=5)
+
+                await context.bot.restrict_chat_member(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    permissions=ChatPermissions(
+                        can_send_messages=False
+                    ),
+                    until_date=until,
+                )
+
+                return
+            except Exception:
+                pass
+
+    if user_id in waiting_for_movie:
+        if text.lower() not in [
+            m.lower() for m in movie_suggestions
+        ]:
+            movie_suggestions.append(text)
+
+            await update.message.reply_text(
+                f"Added: {text} ✅"
+            )
+
+        waiting_for_movie.remove(user_id)
 
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.job_queue.run_daily(auto_q,time=time(hour=14,minute=30,tzinfo=timezone.utc))
+app.job_queue.run_daily(
+    auto_daily,
+    time=time(hour=14, minute=30, tzinfo=timezone.utc),
+)
 
-app.add_handler(CommandHandler("start",start))
-app.add_handler(CommandHandler("movie",movie))
-app.add_handler(CommandHandler("warn",warn))
-app.add_handler(CallbackQueryHandler(button))
-app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS,welcome))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,handle))
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("movie", movie_lookup))
+app.add_handler(CommandHandler("warn", warn_user))
+app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(
+    MessageHandler(
+        filters.StatusUpdate.NEW_CHAT_MEMBERS,
+        welcome,
+    )
+)
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_text,
+    )
+)
 
 print("Bot running 🚀")
 app.run_polling()
