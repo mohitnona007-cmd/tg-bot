@@ -23,7 +23,7 @@ from datetime import datetime, time, timezone, timedelta
 TOKEN = os.getenv("TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+XAI_API_KEY = os.getenv("XAI_API_KEY")
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
