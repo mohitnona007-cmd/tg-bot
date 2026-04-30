@@ -614,7 +614,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     text = (
-        "🎬 Movie Club Commands\n\n"
+        "Commands\n\n"
         "/movie movie name → trailer + info\n"
         "/plot movie name → story/plot\n"
         "/actor actor name → actor details\n"
