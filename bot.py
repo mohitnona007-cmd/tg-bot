@@ -225,6 +225,10 @@ async def send_genre_recommendations(query, genre_key):
 
 
 async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+    await update.message.delete()
+except Exception:
+    pass
     if not context.args:
         await update.message.reply_text("Usage: /movie movie name")
         return
@@ -367,6 +371,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             genre,
         )
 async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+    await update.message.delete()
+except Exception:
+    pass
     if context.args:
         name = " ".join(context.args)
 
