@@ -369,17 +369,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         name = " ".join(context.args)
-        await update.message.reply_text(
-            f"🪦 Rest in peace, {name}"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"🪦 Rest in peace, {name}"
         )
+
     elif update.message.reply_to_message:
         name = update.message.reply_to_message.from_user.first_name
-        await update.message.reply_text(
-            f"🪦 Rest in peace, {name}"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"🪦 Rest in peace, {name}"
         )
+
     else:
-        await update.message.reply_text(
-            "🪦 Rest in peace"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🪦 Rest in peace"
         )
 
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
