@@ -233,7 +233,6 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: /movie movie name")
         return
-
     movie_name = " ".join(context.args)
 
     url = (
@@ -521,7 +520,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-   if user_id in waiting_for_movie:
+    if user_id in waiting_for_movie:
     try:
         url = (
             f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
