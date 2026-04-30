@@ -713,17 +713,19 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
 async def w_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        await update.message.delete()
-    except Exception:
-        pass
+    global GROUP_CHAT_ID
 
     text = update.message.text.replace("/w", "").strip()
 
     if not text:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Use:\n/w your text"
+        await update.message.reply_text(
+            "Use:\n/w your text"
+        )
+        return
+
+    if not GROUP_CHAT_ID:
+        await update.message.reply_text(
+            "No group linked yet. Use /start in group first."
         )
         return
 
@@ -766,8 +768,12 @@ async def w_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         meme = "Reality wrote a better joke ☠️"
 
     await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+        chat_id=GROUP_CHAT_ID,
         text=meme,
+    )
+
+    await update.message.reply_text(
+        "✅ Meme posted in group"
     )
     
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
