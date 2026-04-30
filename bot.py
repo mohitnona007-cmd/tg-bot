@@ -975,4 +975,4 @@ app.add_handler(
 )
 
 print("Bot running 🚀")
-app.run_polling()
+app.run_polling(drop_pending_updates=True)
