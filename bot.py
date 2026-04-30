@@ -371,8 +371,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query,
             genre,
         )
+        
 async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-     try:
+    try:
         await update.message.delete()
     except Exception:
         pass
@@ -398,7 +399,7 @@ async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             text="🪦 Rest in peace"
         )
-
+        
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
