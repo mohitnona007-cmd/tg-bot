@@ -448,26 +448,6 @@ async def vs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_anonymous=False,
     ) 
     
-async def confess_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        await update.message.delete()
-    except Exception:
-        pass
-
-    text = update.message.text.replace("/confess", "").strip()
-
-    if not text:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Use:\n/confess your message"
-        )
-        return
-
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"🤫 Anonymous confession:\n\n{text}"
-    )
-    
 async def plot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.delete()
@@ -799,7 +779,6 @@ app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
 app.add_handler(CommandHandler("f", f_command))
 app.add_handler(CommandHandler("vs", vs_command))
-app.add_handler(CommandHandler("confess", confess_command))
 app.add_handler(CommandHandler("plot", plot_command))
 app.add_handler(CommandHandler("actor", actor_command))
 app.add_handler(CommandHandler("help", help_command))
