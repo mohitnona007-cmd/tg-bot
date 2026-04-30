@@ -607,6 +607,30 @@ async def actor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
     
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    text = (
+        "🎬 Movie Club Commands\n\n"
+        "/movie movie name → trailer + info\n"
+        "/plot movie name → story/plot\n"
+        "/actor actor name → actor details\n"
+        "/confess message → anonymous confession\n"
+        "/f name → RIP meme command\n"
+        "/vs Movie 1 | Movie 2 → battle poll\n"
+        "/start → open menu\n"
+        "/help → show commands\n\n"
+        "🎭 Buttons also available for genres, voting and suggestions."
+    )
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
+    )
+    
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -778,6 +802,7 @@ app.add_handler(CommandHandler("vs", vs_command))
 app.add_handler(CommandHandler("confess", confess_command))
 app.add_handler(CommandHandler("plot", plot_command))
 app.add_handler(CommandHandler("actor", actor_command))
+app.add_handler(CommandHandler("help", help_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
