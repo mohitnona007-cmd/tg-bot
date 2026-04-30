@@ -600,6 +600,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/movie movie name → trailer + info\n"
         "/plot movie name → story/plot\n"
         "/actor actor name → actor details\n"
+        "/meme name → meme command\n"
         "/f name → RIP meme command\n"
         "/vs Movie 1 | Movie 2 → battle poll\n"
         "/start → open menu\n"
@@ -625,6 +626,16 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    target = None
+
+    # reply target
+    if update.message.reply_to_message:
+        target = update.message.reply_to_message.from_user
+
+    # typed username target
+    elif context.args:
+        target = " ".join(context.args)
+
     convo = "\n".join(recent_messages[-15:])
 
     headers = {
@@ -632,24 +643,30 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Content-Type": "application/json",
     }
 
+    if target:
+        if isinstance(target, str):
+            target_name = target
+        else:
+            target_name = target.first_name
+
+        prompt = (
+            f"Create ONE short savage dark meme roast about {target_name} "
+            f"using this chat context:\n\n{convo}\n\n"
+            "Keep it funny, internet slang, under 20 words."
+        )
+    else:
+        prompt = (
+            "Create ONE short savage dark meme line from this chat:\n\n"
+            + convo
+        )
+
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Generate ONE short savage dark meme line "
-                    "based on chat context. Keep it funny, sharp, "
-                    "internet slang, under 20 words."
-                ),
-            },
-            {
-                "role": "user",
-                "content": convo,
-            },
+            {"role": "user", "content": prompt}
         ],
         "temperature": 1.2,
-        "max_tokens": 50,
+        "max_tokens": 60,
     }
 
     try:
@@ -670,10 +687,30 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         meme = "Braincells left the chat ☠️"
 
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=meme,
-    )
+    # tag user
+    if target and not isinstance(target, str):
+        if target.username:
+            text = f"@{target.username} {meme}"
+        else:
+            text = f"<a href='tg://user?id={target.id}'>{target.first_name}</a> {meme}"
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+            parse_mode="HTML",
+        )
+
+    elif target and isinstance(target, str):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"{target} {meme}",
+        )
+
+    else:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=meme,
+        )
     
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
