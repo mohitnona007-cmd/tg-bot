@@ -473,9 +473,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat_id, user_id, context):
             try:
                 await update.message.delete()
-                return
             except Exception:
                 pass
+            return
 
     words = re.findall(r"\b\w+\b", lower)
 
@@ -483,9 +483,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat_id, user_id, context):
             try:
                 await update.message.delete()
-                return
             except Exception:
                 pass
+            return
 
     now = datetime.now().timestamp()
 
@@ -502,9 +502,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_message_times[user_id]) >= 5:
         if not await is_admin(chat_id, user_id, context):
             try:
-                until = datetime.now(
-                    timezone.utc
-                ) + timedelta(minutes=5)
+                until = datetime.now(timezone.utc) + timedelta(minutes=5)
 
                 await context.bot.restrict_chat_member(
                     chat_id=chat_id,
@@ -514,48 +512,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ),
                     until_date=until,
                 )
-
-                return
             except Exception:
                 pass
-
-    if user_id in waiting_for_movie:
-    try:
-        url = (
-            f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
-            f"&t={urllib.parse.quote(text)}"
-        )
-
-        data = requests.get(url, timeout=10).json()
-
-        if data.get("Response") == "False":
-            await update.message.reply_text(
-                "❌ Movie not found.\nSend a valid movie name."
-            )
             return
 
-        title = data.get("Title", text)
-
-        if title.lower() in [
-            m.lower() for m in movie_suggestions
-        ]:
-            await update.message.reply_text(
-                "🎬 Already suggested"
-            )
-        else:
-            movie_suggestions.append(title)
-
-            await update.message.reply_text(
-                f"✅ Added: {title}"
+    if user_id in waiting_for_movie:
+        try:
+            url = (
+                f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
+                f"&t={urllib.parse.quote(text)}"
             )
 
-        waiting_for_movie.remove(user_id)
+            data = requests.get(url, timeout=10).json()
 
-    except Exception:
-        await update.message.reply_text(
-            "Couldn't verify movie 😅"
-        )
-        waiting_for_movie.remove(user_id)
+            if data.get("Response") == "False":
+                await update.message.reply_text(
+                    "❌ Movie not found.\nSend a valid movie name."
+                )
+                return
+
+            title = data.get("Title", text)
+
+            if title.lower() in [
+                m.lower() for m in movie_suggestions
+            ]:
+                await update.message.reply_text(
+                    "🎬 Already suggested"
+                )
+            else:
+                movie_suggestions.append(title)
+
+                await update.message.reply_text(
+                    f"✅ Added: {title}"
+                )
+
+            waiting_for_movie.remove(user_id)
+
+        except Exception:
+            await update.message.reply_text(
+                "Couldn't verify movie 😅"
+            )
+            waiting_for_movie.remove(user_id)
 
 app = ApplicationBuilder().token(TOKEN).build()
 
