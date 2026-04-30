@@ -598,7 +598,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/movie movie name → trailer + info\n"
         "/plot movie name → story/plot\n"
         "/actor actor name → actor details\n"
-        "/confess message → anonymous confession\n"
         "/f name → RIP meme command\n"
         "/vs Movie 1 | Movie 2 → battle poll\n"
         "/start → open menu\n"
