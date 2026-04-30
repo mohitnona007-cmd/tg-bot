@@ -711,6 +711,64 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             text=meme,
         )
+        
+async def w_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    text = update.message.text.replace("/w", "").strip()
+
+    if not text:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/w your text"
+        )
+        return
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    prompt = (
+        "Turn this into ONE funny dark meme line. "
+        "Keep it savage, witty, internet slang, under 25 words.\n\n"
+        f"{text}"
+    )
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 1.2,
+        "max_tokens": 60,
+    }
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+
+        data = r.json()
+
+        if "choices" in data:
+            meme = data["choices"][0]["message"]["content"].strip()
+        else:
+            meme = "That story had villain arc energy 💀"
+
+    except Exception:
+        meme = "Reality wrote a better joke ☠️"
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=meme,
+    )
     
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
@@ -889,6 +947,7 @@ app.add_handler(CommandHandler("plot", plot_command))
 app.add_handler(CommandHandler("actor", actor_command))
 app.add_handler(CommandHandler("help", help_command))
 app.add_handler(CommandHandler("meme", meme_command))
+app.add_handler(CommandHandler("w", w_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
