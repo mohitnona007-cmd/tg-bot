@@ -742,8 +742,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     recent_messages.append(text)
 
-if len(recent_messages) > 20:
-    recent_messages.pop(0)
+    if len(recent_messages) > 20:
+        recent_messages.pop(0)
 
     suspicious = [
         "t.me/",
