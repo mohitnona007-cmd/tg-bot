@@ -633,7 +633,7 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     payload = {
-        "model": "grok-beta",
+        "model": "grok-3-mini",
         "messages": [
             {
                 "role": "user",
