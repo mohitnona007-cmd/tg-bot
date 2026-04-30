@@ -229,9 +229,14 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.delete()
     except Exception:
         pass
+
     if not context.args:
-        await update.message.reply_text("Usage: /movie movie name")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Usage: /movie movie name"
+        )
         return
+
     movie_name = " ".join(context.args)
 
     url = (
@@ -242,13 +247,17 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         data = requests.get(url, timeout=10).json()
     except Exception:
-        await update.message.reply_text(
-            "Couldn't fetch movie info 😅"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Couldn't fetch movie info 😅"
         )
         return
 
     if data.get("Response") == "False":
-        await update.message.reply_text("Movie not found 😅")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Movie not found 😅"
+        )
         return
 
     title = data.get("Title", "N/A")
@@ -265,10 +274,13 @@ async def movie_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("▶ Watch Trailer", url=trailer)]
     ]
 
-    await update.message.reply_text(
-        f"🎬 {title} ({year})\n"
-        f"⭐ IMDb: {rating}\n\n"
-        f"{plot}",
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            f"🎬 {title} ({year})\n"
+            f"⭐ IMDb: {rating}\n\n"
+            f"{plot}"
+        ),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
