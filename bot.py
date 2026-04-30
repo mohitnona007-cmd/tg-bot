@@ -410,6 +410,43 @@ async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="🪦 Rest in peace"
         )
         
+async def vs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    full_text = update.message.text.replace("/vs", "").strip()
+
+    if "|" not in full_text:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/vs Movie 1 | Movie 2"
+        )
+        return
+
+    movie1, movie2 = full_text.split("|", 1)
+
+    movie1 = movie1.strip()
+    movie2 = movie2.strip()
+
+    if not movie1 or not movie2:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/vs Movie 1 | Movie 2"
+        )
+        return
+
+    await context.bot.send_poll(
+        chat_id=update.effective_chat.id,
+        question="🎬 Which is better?",
+        options=[
+            movie1,
+            movie2,
+            "NOTA 🙅"
+        ],
+        is_anonymous=False,
+    )        
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -577,6 +614,7 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
 app.add_handler(CommandHandler("f", f_command))
+app.add_handler(CommandHandler("vs", vs_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
