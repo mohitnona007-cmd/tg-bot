@@ -446,7 +446,167 @@ async def vs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "NOTA 🙅"
         ],
         is_anonymous=False,
-    )        
+    ) 
+    
+async def confess_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    text = update.message.text.replace("/confess", "").strip()
+
+    if not text:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/confess your message"
+        )
+        return
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"🤫 Anonymous confession:\n\n{text}"
+    )
+    
+async def plot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    if not context.args:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/plot movie name"
+        )
+        return
+
+    movie_name = " ".join(context.args)
+
+    url = (
+        f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
+        f"&t={urllib.parse.quote(movie_name)}"
+    )
+
+    try:
+        data = requests.get(url, timeout=10).json()
+    except Exception:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Couldn't fetch plot 😅"
+        )
+        return
+
+    if data.get("Response") == "False":
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Movie not found 😅"
+        )
+        return
+
+    title = data.get("Title", "Unknown")
+    year = data.get("Year", "N/A")
+    plot = data.get("Plot", "No plot found.")
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            f"🎬 {title} ({year})\n\n"
+            f"{plot}"
+        )
+    )
+async def actor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    if not context.args:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Use:\n/actor actor name"
+        )
+        return
+
+    actor_name = " ".join(context.args)
+
+    search_url = (
+        "https://api.themoviedb.org/3/search/person"
+        f"?api_key={TMDB_API_KEY}"
+        f"&query={urllib.parse.quote(actor_name)}"
+    )
+
+    try:
+        search = requests.get(search_url, timeout=10).json()
+        results = search.get("results", [])
+    except Exception:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Couldn't fetch actor 😅"
+        )
+        return
+
+    if not results:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Actor not found 😅"
+        )
+        return
+
+    person = results[0]
+    person_id = person["id"]
+    name = person.get("name", actor_name)
+    known = person.get("known_for_department", "Acting")
+
+    details_url = (
+        f"https://api.themoviedb.org/3/person/{person_id}"
+        f"?api_key={TMDB_API_KEY}"
+    )
+
+    credits_url = (
+        f"https://api.themoviedb.org/3/person/{person_id}/movie_credits"
+        f"?api_key={TMDB_API_KEY}"
+    )
+
+    try:
+        details = requests.get(details_url, timeout=10).json()
+        credits = requests.get(credits_url, timeout=10).json()
+    except Exception:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Couldn't fetch actor details 😅"
+        )
+        return
+
+    birthday = details.get("birthday", "Unknown")
+    bio = details.get("biography", "No biography available.")
+
+    movies = credits.get("cast", [])
+    movies = sorted(
+        movies,
+        key=lambda x: x.get("popularity", 0),
+        reverse=True,
+    )[:5]
+
+    top_movies = ", ".join(
+        [m.get("title", "") for m in movies]
+    ) or "N/A"
+
+    short_bio = bio[:500]
+    if len(bio) > 500:
+        short_bio += "..."
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            f"🎭 {name}\n"
+            f"🎂 Born: {birthday}\n"
+            f"🎬 Known for: {known}\n"
+            f"⭐ Popular movies: {top_movies}\n\n"
+            f"{short_bio}"
+        )
+    )
+    
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -615,6 +775,9 @@ app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
 app.add_handler(CommandHandler("f", f_command))
 app.add_handler(CommandHandler("vs", vs_command))
+app.add_handler(CommandHandler("confess", confess_command))
+app.add_handler(CommandHandler("plot", plot_command))
+app.add_handler(CommandHandler("actor", actor_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
