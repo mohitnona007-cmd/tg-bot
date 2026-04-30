@@ -23,7 +23,7 @@ from datetime import datetime, time, timezone, timedelta
 TOKEN = os.getenv("TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-XAI_API_KEY = os.getenv("XAI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
@@ -628,44 +628,47 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     convo = "\n".join(recent_messages[-15:])
 
     headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
     }
 
     payload = {
-        "model": "grok-3-mini",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {
-                "role": "user",
+                "role": "system",
                 "content": (
-                    "Make ONE short savage meme line from this chat:\n\n"
-                    + convo
+                    "Generate ONE short savage dark meme line "
+                    "based on chat context. Keep it funny, sharp, "
+                    "internet slang, under 20 words."
                 ),
-            }
+            },
+            {
+                "role": "user",
+                "content": convo,
+            },
         ],
-        "temperature": 1.1,
+        "temperature": 1.2,
         "max_tokens": 50,
     }
 
     try:
         r = requests.post(
-            "https://api.x.ai/v1/chat/completions",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers=headers,
             json=payload,
             timeout=20,
         )
 
         data = r.json()
-        print(data)  # debug in Railway logs
 
         if "choices" in data:
             meme = data["choices"][0]["message"]["content"].strip()
         else:
-            meme = "Braincells left the chat ☠️"
+            meme = "Collective IQ in freefall 📉"
 
-    except Exception as e:
-        print("MEME ERROR:", e)
-        meme = "Collective IQ in freefall 📉"
+    except Exception:
+        meme = "Braincells left the chat ☠️"
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
