@@ -36,6 +36,7 @@ waiting_for_movie = set()
 warns = {}
 user_message_times = {}
 GROUP_CHAT_ID = None
+join_times = {}
 
 BAD_WORDS = {
     "fuck",
@@ -116,6 +117,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
         for user in update.message.new_chat_members:
+            join_times[user.id] = datetime.now(timezone.utc)
+            
             msg = await update.message.reply_text(
                 f"Welcome {user.first_name}! 🎬\n\n"
                 "Introduce yourself 👋\n"
@@ -363,7 +366,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query,
             genre,
         )
-
+async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.args:
+        name = " ".join(context.args)
+        await update.message.reply_text(
+            f"🪦 Rest in peace, {name}"
+        )
+    elif update.message.reply_to_message:
+        name = update.message.reply_to_message.from_user.first_name
+        await update.message.reply_text(
+            f"🪦 Rest in peace, {name}"
+        )
+    else:
+        await update.message.reply_text(
+            "🪦 Rest in peace"
+        )
 
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
@@ -400,7 +417,23 @@ async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"{target.first_name} muted for 1 hour 🔇"
         )
+async def member_left(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    left_user = update.message.left_chat_member
 
+    if not left_user:
+        return
+
+    joined_at = join_times.get(left_user.id)
+
+    if joined_at:
+        diff = datetime.now(timezone.utc) - joined_at
+
+        if diff.total_seconds() <= 86400:
+            await update.message.reply_text(
+                f"{left_user.first_name} left for the milk 🥛"
+            )
+
+        del join_times[left_user.id]
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -493,11 +526,18 @@ app.job_queue.run_daily(
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
+app.add_handler(CommandHandler("f", f_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
         filters.StatusUpdate.NEW_CHAT_MEMBERS,
         welcome,
+    )
+)
+app.add_handler(
+    MessageHandler(
+        filters.StatusUpdate.LEFT_CHAT_MEMBER,
+        member_left,
     )
 )
 app.add_handler(
