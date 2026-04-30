@@ -510,18 +510,43 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-    if user_id in waiting_for_movie:
-        if text.lower() not in [
+   if user_id in waiting_for_movie:
+    try:
+        url = (
+            f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}"
+            f"&t={urllib.parse.quote(text)}"
+        )
+
+        data = requests.get(url, timeout=10).json()
+
+        if data.get("Response") == "False":
+            await update.message.reply_text(
+                "❌ Movie not found.\nSend a valid movie name."
+            )
+            return
+
+        title = data.get("Title", text)
+
+        if title.lower() in [
             m.lower() for m in movie_suggestions
         ]:
-            movie_suggestions.append(text)
+            await update.message.reply_text(
+                "🎬 Already suggested"
+            )
+        else:
+            movie_suggestions.append(title)
 
             await update.message.reply_text(
-                f"Added: {text} ✅"
+                f"✅ Added: {title}"
             )
 
         waiting_for_movie.remove(user_id)
 
+    except Exception:
+        await update.message.reply_text(
+            "Couldn't verify movie 😅"
+        )
+        waiting_for_movie.remove(user_id)
 
 app = ApplicationBuilder().token(TOKEN).build()
 
