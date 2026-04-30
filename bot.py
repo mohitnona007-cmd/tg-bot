@@ -23,6 +23,7 @@ from datetime import datetime, time, timezone, timedelta
 TOKEN = os.getenv("TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
@@ -37,6 +38,7 @@ warns = {}
 user_message_times = {}
 GROUP_CHAT_ID = None
 join_times = {}
+recent_messages = []
 
 BAD_WORDS = {
     "fuck",
@@ -610,6 +612,71 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=text,
     )
     
+async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    if not recent_messages:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Chat is too quiet to roast 😴"
+        )
+        return
+
+    convo = "\n".join(recent_messages[-15:])
+
+    prompt = (
+        "Read this group chat and create ONE short savage dark meme line. "
+        "Keep it funny, roasty, internet-style slang, under 20 words. "
+        "No explanation, only the meme line.\n\n"
+        f"Chat:\n{convo}"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "grok-beta",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a savage meme generator. "
+                    "Make short funny dark roast lines."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        "temperature": 1.2,
+        "max_tokens": 60,
+    }
+
+    try:
+        r = requests.post(
+            "https://api.x.ai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=25,
+        )
+
+        data = r.json()
+        meme = data["choices"][0]["message"]["content"].strip()
+
+    except Exception:
+        meme = "Collective brain cell count approaching zero ☠️"
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=meme,
+    )   
+    
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -672,6 +739,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
     lower = text.lower()
+
+    recent_messages.append(text)
+
+if len(recent_messages) > 20:
+    recent_messages.pop(0)
 
     suspicious = [
         "t.me/",
@@ -781,6 +853,7 @@ app.add_handler(CommandHandler("vs", vs_command))
 app.add_handler(CommandHandler("plot", plot_command))
 app.add_handler(CommandHandler("actor", actor_command))
 app.add_handler(CommandHandler("help", help_command))
+app.add_handler(CommandHandler("meme", meme_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
