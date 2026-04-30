@@ -627,13 +627,6 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     convo = "\n".join(recent_messages[-15:])
 
-    prompt = (
-        "Read this group chat and create ONE short savage dark meme line. "
-        "Keep it funny, roasty, internet-style slang, under 20 words. "
-        "No explanation, only the meme line.\n\n"
-        f"Chat:\n{convo}"
-    )
-
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json",
@@ -643,19 +636,15 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "model": "grok-beta",
         "messages": [
             {
-                "role": "system",
-                "content": (
-                    "You are a savage meme generator. "
-                    "Make short funny dark roast lines."
-                ),
-            },
-            {
                 "role": "user",
-                "content": prompt,
-            },
+                "content": (
+                    "Make ONE short savage meme line from this chat:\n\n"
+                    + convo
+                ),
+            }
         ],
-        "temperature": 1.2,
-        "max_tokens": 60,
+        "temperature": 1.1,
+        "max_tokens": 50,
     }
 
     try:
@@ -663,19 +652,25 @@ async def meme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "https://api.x.ai/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=25,
+            timeout=20,
         )
 
         data = r.json()
-        meme = data["choices"][0]["message"]["content"].strip()
+        print(data)  # debug in Railway logs
 
-    except Exception:
-        meme = "Collective brain cell count approaching zero ☠️"
+        if "choices" in data:
+            meme = data["choices"][0]["message"]["content"].strip()
+        else:
+            meme = "Braincells left the chat ☠️"
+
+    except Exception as e:
+        print("MEME ERROR:", e)
+        meme = "Collective IQ in freefall 📉"
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=meme,
-    )   
+    )
     
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
