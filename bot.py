@@ -775,6 +775,70 @@ async def w_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✅ Meme posted in group"
     )
+async def d_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global GROUP_CHAT_ID
+
+    text = update.message.text.replace("/d", "").strip()
+
+    if not text:
+        await update.message.reply_text(
+            "Use:\n/d your text"
+        )
+        return
+
+    if not GROUP_CHAT_ID:
+        await update.message.reply_text(
+            "No group linked yet. Use /start in group first."
+        )
+        return
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    prompt = (
+        "Fix grammar and lightly improve wording. "
+        "Keep original meaning and tone. "
+        "Do NOT over-rewrite. Return only polished text.\n\n"
+        f"{text}"
+    )
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 120,
+    }
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+
+        data = r.json()
+
+        if "choices" in data:
+            polished = data["choices"][0]["message"]["content"].strip()
+        else:
+            polished = text
+
+    except Exception:
+        polished = text
+
+    await context.bot.send_message(
+        chat_id=GROUP_CHAT_ID,
+        text=polished,
+    )
+
+    await update.message.reply_text(
+        "✅ Posted in group"
+    )
     
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
@@ -954,6 +1018,7 @@ app.add_handler(CommandHandler("actor", actor_command))
 app.add_handler(CommandHandler("help", help_command))
 app.add_handler(CommandHandler("meme", meme_command))
 app.add_handler(CommandHandler("w", w_command))
+app.add_handler(CommandHandler("d", d_command))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(
     MessageHandler(
