@@ -1124,7 +1124,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ),
                 )
 
-                        else:
+             else:
                 until = datetime.now(timezone.utc) + timedelta(days=1)
 
                 try:
@@ -1145,7 +1145,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"{user.first_name} muted for 1 day ⏳\n"
                         "Reason: repeated inappropriate behavior"
                     ),
-                )
+                )     
             return
 
     now = datetime.now().timestamp()
