@@ -1124,11 +1124,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ),
                 )
 
-            else:
+                        else:
+                until = datetime.now(timezone.utc) + timedelta(days=1)
+
                 try:
-                    await context.bot.ban_chat_member(
+                    await context.bot.restrict_chat_member(
                         chat_id=chat_id,
                         user_id=user_id,
+                        permissions=ChatPermissions(
+                            can_send_messages=False
+                        ),
+                        until_date=until,
                     )
                 except Exception:
                     pass
@@ -1136,13 +1142,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=(
-                        f"{user.first_name} banned 🔨\n"
-                        "Reason: repeated predatory / spam behavior"
+                        f"{user.first_name} muted for 1 day ⏳\n"
+                        "Reason: repeated inappropriate behavior"
                     ),
                 )
-
-                warns[user_id] = 0
-
             return
 
     now = datetime.now().timestamp()
