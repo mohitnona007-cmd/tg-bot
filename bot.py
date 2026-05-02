@@ -969,11 +969,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             return
 
-        words = re.findall(r"\b\w+\b", lower)
+    words = re.findall(r"\b\w+\b", lower)
 
     bad_word = any(w in BAD_WORDS for w in words)
     ai_bad = await ai_flag_message(text)
-
+    
     if bad_word or ai_bad:
         if not await is_admin(chat_id, user_id, context):
 
