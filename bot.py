@@ -598,7 +598,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/movie movie name → trailer + info\n"
         "/plot movie name → story/plot\n"
         "/actor actor name → actor details\n"
-        "/meme name → meme command\n"
         "/f name → RIP meme command\n"
         "/vs Movie 1 | Movie 2 → battle poll\n"
         "/start → open menu\n"
@@ -838,6 +837,54 @@ async def d_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ Posted in group"
     )
     
+async def ai_flag_message(text: str):
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    prompt = (
+        "Decide if this message is harmful in a Telegram group.\n\n"
+        "Flag ONLY if it is:\n"
+        "- asking for pics/nudes\n"
+        "- creepy flirting / harassment\n"
+        "- predatory DM pushing\n"
+        "- join my channel / promo spam\n"
+        "- earn money fast scam\n"
+        "- suspicious promotion / shady selling\n\n"
+        "Do NOT flag if discussing or criticizing those things.\n\n"
+        "Reply ONLY YES or NO.\n\n"
+        f"Message: {text}"
+    )
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0,
+        "max_tokens": 5,
+    }
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+
+        data = r.json()
+
+        if "choices" in data:
+            answer = data["choices"][0]["message"]["content"].strip().upper()
+            return answer == "YES"
+
+    except Exception:
+        pass
+
+    return False
+    
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -922,14 +969,87 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             return
 
-    words = re.findall(r"\b\w+\b", lower)
+        words = re.findall(r"\b\w+\b", lower)
 
-    if any(w in BAD_WORDS for w in words):
+    bad_word = any(w in BAD_WORDS for w in words)
+    ai_bad = await ai_flag_message(text)
+
+    if bad_word or ai_bad:
         if not await is_admin(chat_id, user_id, context):
+
             try:
                 await update.message.delete()
             except Exception:
                 pass
+
+            warns[user_id] = warns.get(user_id, 0) + 1
+            count = warns[user_id]
+
+            if count == 1:
+                until = datetime.now(timezone.utc) + timedelta(hours=1)
+
+                try:
+                    await context.bot.restrict_chat_member(
+                        chat_id=chat_id,
+                        user_id=user_id,
+                        permissions=ChatPermissions(
+                            can_send_messages=False
+                        ),
+                        until_date=until,
+                    )
+                except Exception:
+                    pass
+
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        f"{user.first_name} muted for 1 hour ⚠️\n"
+                        "Reason: inappropriate / creepy / spam behavior"
+                    ),
+                )
+
+            elif count == 2:
+                until = datetime.now(timezone.utc) + timedelta(days=1)
+
+                try:
+                    await context.bot.restrict_chat_member(
+                        chat_id=chat_id,
+                        user_id=user_id,
+                        permissions=ChatPermissions(
+                            can_send_messages=False
+                        ),
+                        until_date=until,
+                    )
+                except Exception:
+                    pass
+
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        f"{user.first_name} muted for 1 day ⏳\n"
+                        "Reason: repeated inappropriate behavior"
+                    ),
+                )
+
+            else:
+                try:
+                    await context.bot.ban_chat_member(
+                        chat_id=chat_id,
+                        user_id=user_id,
+                    )
+                except Exception:
+                    pass
+
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        f"{user.first_name} banned 🔨\n"
+                        "Reason: repeated predatory / spam behavior"
+                    ),
+                )
+
+                warns[user_id] = 0
+
             return
 
     now = datetime.now().timestamp()
