@@ -1069,7 +1069,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if bad_word or ai_bad:
         if not await is_admin(chat_id, user_id, context):
-
             try:
                 await update.message.delete()
             except Exception:
@@ -1101,7 +1100,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ),
                 )
 
-            elif count == 2:
+            else:
                 until = datetime.now(timezone.utc) + timedelta(days=1)
 
                 try:
@@ -1124,30 +1123,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ),
                 )
 
-             else:
-                until = datetime.now(timezone.utc) + timedelta(days=1)
-
-                try:
-                    await context.bot.restrict_chat_member(
-                        chat_id=chat_id,
-                        user_id=user_id,
-                        permissions=ChatPermissions(
-                            can_send_messages=False
-                        ),
-                        until_date=until,
-                    )
-                except Exception:
-                    pass
-
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=(
-                        f"{user.first_name} muted for 1 day ⏳\n"
-                        "Reason: repeated inappropriate behavior"
-                    ),
-                )     
             return
-
     now = datetime.now().timestamp()
 
     if user_id not in user_message_times:
