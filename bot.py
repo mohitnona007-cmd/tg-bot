@@ -374,7 +374,100 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Pick genre 🎬",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
+        
+        elif data.startswith("admin_"):
+        parts = data.split("_")
+        action = parts[1]
+        target_id = int(parts[2])
 
+        if not await is_admin(
+            query.message.chat.id,
+            query.from_user.id,
+            context,
+        ):
+            return
+
+        try:
+            member = await context.bot.get_chat_member(
+                query.message.chat.id,
+                target_id,
+            )
+            name = member.user.first_name
+        except Exception:
+            name = "User"
+
+        if action == "unmute":
+            try:
+                await context.bot.restrict_chat_member(
+                    chat_id=query.message.chat.id,
+                    user_id=target_id,
+                    permissions=ChatPermissions(
+                        can_send_messages=True,
+                        can_send_media_messages=True,
+                        can_send_other_messages=True,
+                        can_add_web_page_previews=True,
+                    ),
+                )
+            except Exception:
+                pass
+
+            await query.message.reply_text(
+                f"{name} unmuted ✅"
+            )
+
+        elif action == "unban":
+            try:
+                await context.bot.unban_chat_member(
+                    chat_id=query.message.chat.id,
+                    user_id=target_id,
+                    only_if_banned=True,
+                )
+            except Exception:
+                pass
+
+            await query.message.reply_text(
+                f"{name} unbanned ♻️"
+            )
+
+        elif action == "reset":
+            warns[target_id] = 0
+
+            await query.message.reply_text(
+                f"{name} warns reset ⚠️"
+            )
+
+        elif action == "mute":
+            until = datetime.now(timezone.utc) + timedelta(hours=1)
+
+            try:
+                await context.bot.restrict_chat_member(
+                    chat_id=query.message.chat.id,
+                    user_id=target_id,
+                    permissions=ChatPermissions(
+                        can_send_messages=False
+                    ),
+                    until_date=until,
+                )
+            except Exception:
+                pass
+
+            await query.message.reply_text(
+                f"{name} muted for 1 hour 🔇"
+            )
+
+        elif action == "ban":
+            try:
+                await context.bot.ban_chat_member(
+                    chat_id=query.message.chat.id,
+                    user_id=target_id,
+                )
+            except Exception:
+                pass
+
+            await query.message.reply_text(
+                f"{name} banned ⛔"
+            )
+            
     elif data.startswith("genre_"):
         genre = data.replace("genre_", "")
         await send_genre_recommendations(
@@ -885,6 +978,62 @@ async def ai_flag_message(text: str):
 
     return False
     
+async def manage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(
+        update.effective_chat.id,
+        update.effective_user.id,
+        context,
+    ):
+        return
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text(
+            "Reply to a user's message, then use /manage"
+        )
+        return
+
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    target = update.message.reply_to_message.from_user
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🔓 Unmute",
+                callback_data=f"admin_unmute_{target.id}"
+            ),
+            InlineKeyboardButton(
+                "♻️ Unban",
+                callback_data=f"admin_unban_{target.id}"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "⚠️ Reset Warns",
+                callback_data=f"admin_reset_{target.id}"
+            ),
+            InlineKeyboardButton(
+                "🔇 Mute 1h",
+                callback_data=f"admin_mute_{target.id}"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "⛔ Ban",
+                callback_data=f"admin_ban_{target.id}"
+            ),
+        ],
+    ]
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Manage {target.first_name}:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(
         update.effective_chat.id,
@@ -1129,6 +1278,7 @@ app.job_queue.run_daily(
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("movie", movie_lookup))
 app.add_handler(CommandHandler("warn", warn_user))
+app.add_handler(CommandHandler("manage", manage_command))
 app.add_handler(CommandHandler("f", f_command))
 app.add_handler(CommandHandler("vs", vs_command))
 app.add_handler(CommandHandler("plot", plot_command))
