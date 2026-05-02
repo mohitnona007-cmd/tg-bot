@@ -102,8 +102,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     GROUP_CHAT_ID = update.effective_chat.id
 
     keyboard = [
-        [InlineKeyboardButton("🎬 Vote Movie", callback_data="vote")],
-        [InlineKeyboardButton("✍️ Suggest Movie", callback_data="suggest")],
         [InlineKeyboardButton("🎭 Suggest by Genre", callback_data="genre_menu")],
         [InlineKeyboardButton("📜 Rules", callback_data="rules")],
         [InlineKeyboardButton("💬 Daily Question", callback_data="daily")],
