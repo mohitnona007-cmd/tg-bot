@@ -329,8 +329,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "Use:\n/movie Interstellar"
         )
-
-    elif data == "genre_menu":
+    
+     elif data == "genre_menu":
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -374,8 +374,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Pick genre 🎬",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
-        
-        elif data.startswith("admin_"):
+
+    elif data.startswith("admin_"):
         parts = data.split("_")
         action = parts[1]
         target_id = int(parts[2])
@@ -402,10 +402,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=query.message.chat.id,
                     user_id=target_id,
                     permissions=ChatPermissions(
-                        can_send_messages=True,
-                        can_send_media_messages=True,
-                        can_send_other_messages=True,
-                        can_add_web_page_previews=True,
+                        can_send_messages=True
                     ),
                 )
             except Exception:
@@ -467,7 +464,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(
                 f"{name} banned ⛔"
             )
-            
+
     elif data.startswith("genre_"):
         genre = data.replace("genre_", "")
         await send_genre_recommendations(
