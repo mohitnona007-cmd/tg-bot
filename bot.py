@@ -301,25 +301,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Keep chat friendly"
         )
 
-    elif data == "suggest":
-        waiting_for_movie.add(user_id)
-        await query.message.reply_text(
-            "✍️ Send movie name in chat."
-        )
-
-    elif data == "vote":
-        if not movie_suggestions:
-            await query.message.reply_text(
-                "No suggestions yet 😅"
-            )
-            return
-
-        await query.message.reply_poll(
-            question="🎬 Which movie should we watch?",
-            options=movie_suggestions[:9] + ["NOTA 🙅"],
-            is_anonymous=False,
-        )
-
     elif data == "daily":
         await query.message.reply_text(
             random.choice(DAILY_QUESTIONS)
@@ -329,44 +310,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "Use:\n/movie Interstellar"
         )
-    
-     elif data == "genre_menu":
+
+    elif data == "genre_menu":
         keyboard = [
             [
-                InlineKeyboardButton(
-                    "😂 Comedy",
-                    callback_data="genre_comedy"
-                ),
-                InlineKeyboardButton(
-                    "🔥 Action",
-                    callback_data="genre_action"
-                ),
+                InlineKeyboardButton("😂 Comedy", callback_data="genre_comedy"),
+                InlineKeyboardButton("🔥 Action", callback_data="genre_action"),
             ],
             [
-                InlineKeyboardButton(
-                    "😱 Horror",
-                    callback_data="genre_horror"
-                ),
-                InlineKeyboardButton(
-                    "❤️ Romance",
-                    callback_data="genre_romance"
-                ),
+                InlineKeyboardButton("😱 Horror", callback_data="genre_horror"),
+                InlineKeyboardButton("❤️ Romance", callback_data="genre_romance"),
             ],
             [
-                InlineKeyboardButton(
-                    "🧠 Sci-Fi",
-                    callback_data="genre_scifi"
-                ),
-                InlineKeyboardButton(
-                    "🎭 Drama",
-                    callback_data="genre_drama"
-                ),
+                InlineKeyboardButton("🧠 Sci-Fi", callback_data="genre_scifi"),
+                InlineKeyboardButton("🎭 Drama", callback_data="genre_drama"),
             ],
             [
-                InlineKeyboardButton(
-                    "🎲 Random",
-                    callback_data="genre_random"
-                )
+                InlineKeyboardButton("🎲 Random", callback_data="genre_random"),
             ],
         ]
 
@@ -408,9 +368,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-            await query.message.reply_text(
-                f"{name} unmuted ✅"
-            )
+            await query.message.reply_text(f"{name} unmuted ✅")
 
         elif action == "unban":
             try:
@@ -422,16 +380,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-            await query.message.reply_text(
-                f"{name} unbanned ♻️"
-            )
+            await query.message.reply_text(f"{name} unbanned ♻️")
 
         elif action == "reset":
             warns[target_id] = 0
-
-            await query.message.reply_text(
-                f"{name} warns reset ⚠️"
-            )
+            await query.message.reply_text(f"{name} warns reset ⚠️")
 
         elif action == "mute":
             until = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -448,9 +401,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-            await query.message.reply_text(
-                f"{name} muted for 1 hour 🔇"
-            )
+            await query.message.reply_text(f"{name} muted for 1 hour 🔇")
 
         elif action == "ban":
             try:
@@ -461,16 +412,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-            await query.message.reply_text(
-                f"{name} banned ⛔"
-            )
+            await query.message.reply_text(f"{name} banned ⛔")
 
     elif data.startswith("genre_"):
         genre = data.replace("genre_", "")
-        await send_genre_recommendations(
-            query,
-            genre,
-        )
+        await send_genre_recommendations(query, genre)
+        
         
 async def f_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
